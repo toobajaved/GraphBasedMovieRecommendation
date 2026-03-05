@@ -1,0 +1,8 @@
+total_positive_edges: 48580
+train_pos_edges: 47746
+val_pos_edges: 378
+test_pos_edges: 456
+train_unique_users: 609
+train_unique_movies: 6298
+val_candidates_rows: 19278
+test_candidates_rows: 23256
