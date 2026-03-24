@@ -30,7 +30,9 @@
 -   Use PyTorch Geometric (`torch_geometric`); LightGCN is available as a built-in layer (`LGConv`)
 -   Setup: convert your bipartite graph to a PyG `Data` object with edge_index; use BPR (Bayesian Personalized Ranking) loss — standard for implicit feedback recommendation
 -   Train for ~20-50 epochs, track validation loss, save best checkpoint
--   Extract final user and movie embedding matrices for scoring**Milestone 6: Evaluation** _(~1.5 days)_
+-   Extract final user and movie embedding matrices for scoring
+
+**Milestone 6: Evaluation** 
 
 -   Implement Precision@K, Recall@K, NDCG@K in `evaluation.py` — K=10 or K=20 is typical
 -   For each user in test set: score all 100 candidates (1 positive + 99 negatives), rank them, compute metrics
