@@ -1,0 +1,5 @@
+Model,Precision@10,Recall@10,NDCG@10
+Popularity,0.2417,0.185,0.2531
+Matrix Fact.,0.0417,0.0557,0.116
+GraphSAGE,0.1917,0.1366,0.2204
+LightGCN,0.3083,0.2445,0.309
