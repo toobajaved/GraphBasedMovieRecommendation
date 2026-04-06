@@ -1,6 +1,6 @@
-# Graph-Based Movie Recommendation Using a User–Movie Bipartite Graph
+# Graph-Based Movie Recommendation Using a User-Movie Bipartite Graph
 
-**CSCI 3834 — Machine Learning with Graphs | Saint Mary's University | Winter 2026**  
+**CSCI 3834: Machine Learning with Graphs | Saint Mary's University | Winter 2026**  
 **Mirza Baig · Tooba Javed**
 
 ---
