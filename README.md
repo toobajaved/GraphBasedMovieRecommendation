@@ -1,49 +1,96 @@
-# Graph Based Movie Recommendation System
-**Milestone 1: Dataset Exploration**
+# Graph-Based Movie Recommendation Using a User–Movie Bipartite Graph
 
--   Load `ratings.csv` and `movies.csv` with pandas
--   Compute: number of unique users, movies, ratings; rating value distribution; ratings per user distribution; ratings per movie distribution
--   Plot: histogram of rating values, histogram of ratings per user (log scale helps here)
--   Note sparsity — users/movies that appear very rarely might be worth filtering
+**CSCI 3834 — Machine Learning with Graphs | Saint Mary's University | Winter 2026**  
+**Mirza Baig · Tooba Javed**
 
-**Milestone 2: Graph Construction**
+---
 
--   Create a NetworkX bipartite graph; prefix node IDs (e.g., `user_1`, `movie_123`) to avoid collisions
--   Add edges only for ratings ≥ 4 (positive interactions per your proposal)
--   Compute graph stats: node count by type, edge count, average degree, density
--   Optional lightweight viz: use `nx.draw` on a small subgraph (e.g., top 20 users by activity) — full graph will be too large to render meaningfully
+## Overview
 
-**Milestone 3: Data Preparation** 
--   Chronological split is best for recommender systems: sort by timestamp, use earliest 70% as train, next 10% validation, last 20% test — this simulates real prediction
--   Negative sampling: for each positive (user, movie) pair in validation/test, sample ~99 movies the user hasn't rated; this is standard for ranking evaluation
--   Save processed edge lists as CSVs in `data/processed/`
+This project builds a graph-based movie recommendation system on the 
+[MovieLens Latest Small](https://grouplens.org/datasets/movielens/latest/) 
+dataset. Movie recommendation is framed as a **link prediction** problem 
+on a user–movie bipartite graph, where an edge exists between a user and 
+a movie if the user rated it 4 stars or above.
 
- **Milestone 4: Baselines** 
+Four models are implemented and compared:
 
--   **Popularity baseline**: rank movies by number of positive interactions in training set; recommend top-K to every user regardless of their history — simple but surprisingly competitive
--   **Matrix Factorization**: use `surprise` library (much easier than rolling your own); train SVD on training ratings, predict scores for test pairs
--   Run evaluation (Milestone 6 functions) on both so you have comparison numbers ready
+| Model | Precision@10 | Recall@10 | NDCG@10 |
+|---|---|---|---|
+| Popularity Baseline | 0.2417 | 0.1850 | 0.2531 |
+| Matrix Factorization (SVD) | 0.0417 | 0.0557 | 0.1160 |
+| GraphSAGE | 0.1917 | 0.1366 | 0.2204 |
+| **LightGCN** | **0.3083** | **0.2445** | **0.3090** |
 
-**Milestone 5: GNN Model** 
+LightGCN outperforms all baselines across every metric. Matrix 
+factorization collapses to flat Recall (0.0557 at all K values) under 
+binary interactions and chronological splitting.
 
--   **Recommendation**: go with **LightGCN** over GraphSAGE for this task — it's specifically designed for recommendation, simpler to implement, and likely to perform better on bipartite interaction graphs
--   Use PyTorch Geometric (`torch_geometric`); LightGCN is available as a built-in layer (`LGConv`)
--   Setup: convert your bipartite graph to a PyG `Data` object with edge_index; use BPR (Bayesian Personalized Ranking) loss — standard for implicit feedback recommendation
--   Train for ~20-50 epochs, track validation loss, save best checkpoint
--   Extract final user and movie embedding matrices for scoring
+---
 
-**Milestone 6: Evaluation** 
+## Dataset
 
--   Implement Precision@K, Recall@K, NDCG@K in `evaluation.py` — K=10 or K=20 is typical
--   For each user in test set: score all 100 candidates (1 positive + 99 negatives), rank them, compute metrics
--   Build a clean comparison table: Popularity vs MF vs LightGCN across all three metrics
--   One plot showing performance across different K values is a nice visual
+- **Source:** MovieLens Latest Small — GroupLens Research Group
+- **Size:** 100,836 ratings · 610 users · 9,742 movies
+- **Graph edges:** ratings ≥ 4 only (positive interactions)
+- **After filtering:** 48,580 positive interactions
 
-**Report + Polish** 
+---
 
--   Figures: rating distribution, graph degree distribution, metric comparison table, training loss curve
--   Keep the discussion focused on _why_ the graph model does (or doesn't) outperform 
+## Methodology
 
+### Graph Construction
+Users and movies are represented as nodes in a bipartite graph 
+G = (U ∪ M, E). An edge (u, m) is added when user u rated movie m 
+with a score of 4 or above. Built with NetworkX.
 
+### Data Preparation
+- **Chronological split:** sorted by timestamp → 70% train / 10% val / 20% test
+- **Cold start fix:** users or movies unseen in training moved into training set
+- **Negative sampling:** each positive in val/test paired with unseen movies to form ranking candidate pools
+  - Validation: 19,278 candidate pairs
+  - Test: 23,256 candidate pairs
 
+### Models
 
+**Popularity Baseline** — ranks movies by number of training interactions. Same list for every user. Non-personalized lower bound.
+
+**Matrix Factorization (SVD)** — learns user and item latent vectors via the [Surprise](https://surpriselib.com/) library. Trained on binary interactions.
+
+**GraphSAGE** — two-layer mean neighborhood aggregation with learnable node embeddings. Trained with binary cross-entropy loss.  
+Best config: lr=1e-3, dim=128, dropout=0.1, neg_ratio=3, 220 epochs.
+
+**LightGCN** — removes nonlinear activations from graph convolution, keeping only neighborhood aggregation averaged across layers. Trained with BPR loss (directly optimizes ranking). Implemented with PyTorch Geometric (`LGConv`).  
+Best config: lr=1e-3, dim=128, 3 layers, neg_ratio=3, reg=1e-4, 220 epochs.
+
+Both GNN models were tuned via a learning rate sweep over 
+{1e-4, 5e-4, 1e-3, 3e-3} followed by a hyperparameter search, 
+with the best configuration selected by validation HR@10.
+
+### Evaluation Metrics
+All models evaluated at K ∈ {1, 5, 10, 15, 20}:
+- **Precision@K** — fraction of top-K recommendations that are relevant
+- **Recall@K** — fraction of all relevant items retrieved in top K
+- **NDCG@K** — position-aware ranking quality, normalized against ideal ordering
+
+---
+
+## Key Findings
+
+- LightGCN achieves the highest Recall and NDCG at every value of K ≥ 5, reaching Recall@20 = 0.4086
+- GraphSAGE uses the same graph as LightGCN but underperforms the popularity baseline at K=10 — the training objective (cross-entropy vs. BPR) matters as much as graph access
+- Matrix factorization produces flat Recall across all K values, indicating it ranks one item confidently per user and assigns near-uniform scores to everything else
+- The popularity baseline is competitive due to temporal alignment with the chronological test split, not genuine personalization
+
+---
+
+## Requirements
+```bash
+pip install torch torch-geometric pandas numpy networkx scikit-surprise matplotlib
+```
+
+---
+
+## Report
+
+The full project report (ACM SIGCONF format) is included in the repository as `CSCI3834_FinalReport_BaigJaved.pdf`.
